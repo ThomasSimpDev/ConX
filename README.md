@@ -60,5 +60,5 @@ clean.bat
 
 ### Windows
 ```cmd
-.\build\Release\conx_engine.exe lua_scripts/example.lua
+.\build\Release\conx_engine.exe lua_scripts\example.lua
 ```
