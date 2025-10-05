@@ -26,6 +26,7 @@ set(CONX_SOURCES
     src/core/conx_all.c
     src/2d/conx_2d.c
     src/3d/conx_3d.c
+    src/physics/conx_physics.c
 )
 
 # Create library

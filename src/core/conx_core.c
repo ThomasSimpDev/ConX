@@ -1,5 +1,6 @@
 #include "conx.h"
 #include "conx_lua.h"
+#include "conx_csharp.h"
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <GL/gl.h>
@@ -161,9 +162,12 @@ void conx_run(void) {
     
     was_right_pressed = is_right_pressed;
     
-    // Call Lua input function if it exists
+    // Handle scripting updates
     lua_State *L = conx_lua_get_state();
+    MonoDomain *domain = conx_csharp_get_domain();
+    
     if (L) {
+      // Call Lua input function if it exists
       lua_getglobal(L, "handle_input");
       if (lua_isfunction(L, -1)) {
         lua_pushlightuserdata(L, (void*)keys);
@@ -178,16 +182,13 @@ void conx_run(void) {
       } else {
         lua_pop(L, 1);
       }
-    }
 
-    // Check for Lua file changes and reload if needed
-    if (conx_lua_check_reload()) {
-      conx_lua_reload_current_file();
-    }
+      // Check for Lua file changes and reload if needed
+      if (conx_lua_check_reload()) {
+        conx_lua_reload_current_file();
+      }
 
-    // Call Lua update function
-    // Reuse L from above
-    if (L) {
+      // Call Lua update function
       lua_getglobal(L, "update");
       if (lua_isfunction(L, -1)) {
         if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
@@ -198,6 +199,11 @@ void conx_run(void) {
       } else {
         lua_pop(L, 1);
       }
+    } else if (domain) {
+      // Call C# update and render functions
+      float delta_seconds = (float)(engine->delta_time / 1000.0);
+      conx_csharp_execute_update(delta_seconds);
+      conx_csharp_execute_render();
     }
   }
 }

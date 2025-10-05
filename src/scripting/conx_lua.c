@@ -3,6 +3,7 @@
 #include "conx_math.h"
 #include "conx_2d.h"
 #include "conx_3d.h"
+#include "conx_physics.h"
 #include <GL/gl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -276,7 +277,14 @@ static int lua_conx_load_texture(lua_State *L) {
   luaL_getmetatable(L, "ConX.Texture");
   lua_setmetatable(L, -2);
   
-  return 1;
+  return 1;pushcfunction(L, lua_conx_physics_create_body);
+  lua_setfield(L, -2, "physics_create_body");
+  
+  lua_pushcfunction(L, lua_conx_physics_set_velocity);
+  lua_setfield(L, -2, "physics_set_velocity");
+  
+  lua_pushcfunction(L, lua_conx_physics_get_position);
+  lua_setfield(L, -2, "physics_get_position");
 }
 
 static int lua_conx_draw_texture(lua_State *L) {
@@ -298,6 +306,89 @@ static int lua_texture_gc(lua_State *L) {
     conx_free_texture(*texture);
     *texture = NULL;
   }
+  return 0;
+}
+
+// Physics functions
+static int lua_conx_physics_init(lua_State *L) {
+  int max_bodies = (int)luaL_optnumber(L, 1, 100);
+  bool success = conx_physics_init(max_bodies);
+  lua_pushboolean(L, success);
+  return 1;
+}
+
+static int lua_conx_physics_update(lua_State *L) {
+  float dt = (float)luaL_checknumber(L, 1);
+  conx_physics_update(dt);
+  return 0;
+}
+
+static int lua_conx_physics_create_body(lua_State *L) {
+  float x = (float)luaL_checknumber(L, 1);
+  float y = (float)luaL_checknumber(L, 2);
+  float z = (float)luaL_checknumber(L, 3);
+  float mass = (float)luaL_optnumber(L, 4, 1.0);
+  
+  Vec3 pos = {x, y, z};
+  int body_id = conx_physics_create_body(pos, mass);
+  lua_pushinteger(L, body_id);
+  return 1;
+}
+
+static int lua_conx_physics_set_velocity(lua_State *L) {
+  int body_id = (int)luaL_checkinteger(L, 1);
+  float x = (float)luaL_checknumber(L, 2);
+  float y = (float)luaL_checknumber(L, 3);
+  float z = (float)luaL_checknumber(L, 4);
+  
+  Vec3 vel = {x, y, z};
+  conx_physics_set_body_velocity(body_id, vel);
+  return 0;
+}
+
+static int lua_conx_physics_get_position(lua_State *L) {
+  int body_id = (int)luaL_checkinteger(L, 1);
+  ConXRigidBody *body = conx_physics_get_body(body_id);
+  
+  if (body) {
+    lua_pushnumber(L, body->position.x);
+    lua_pushnumber(L, body->position.y);
+    lua_pushnumber(L, body->position.z);
+    return 3;
+  }
+  return 0;
+}
+
+static int lua_conx_physics_set_static(lua_State *L) {
+  int body_id = (int)luaL_checkinteger(L, 1);
+  bool is_static = lua_toboolean(L, 2);
+  conx_physics_set_body_static(body_id, is_static);
+  return 0;
+}
+
+static int lua_conx_physics_add_sphere_shape(lua_State *L) {
+  int body_id = (int)luaL_checkinteger(L, 1);
+  float radius = (float)luaL_checknumber(L, 2);
+  conx_physics_add_sphere_shape(body_id, radius);
+  return 0;
+}
+
+static int lua_conx_physics_add_box_shape(lua_State *L) {
+  int body_id = (int)luaL_checkinteger(L, 1);
+  float x = (float)luaL_checknumber(L, 2);
+  float y = (float)luaL_checknumber(L, 3);
+  float z = (float)luaL_checknumber(L, 4);
+  Vec3 half_extents = {x, y, z};
+  conx_physics_add_box_shape(body_id, half_extents);
+  return 0;
+}
+
+static int lua_conx_physics_set_gravity(lua_State *L) {
+  float x = (float)luaL_checknumber(L, 1);
+  float y = (float)luaL_checknumber(L, 2);
+  float z = (float)luaL_checknumber(L, 3);
+  Vec3 gravity = {x, y, z};
+  conx_physics_set_gravity(gravity);
   return 0;
 }
 
@@ -373,6 +464,34 @@ void conx_lua_register_api(void) {
   lua_setfield(L, -2, "KEY_Q");
   lua_pushnumber(L, SDL_SCANCODE_E);
   lua_setfield(L, -2, "KEY_E");
+  
+  // Physics functions
+  lua_pushcfunction(L, lua_conx_physics_init);
+  lua_setfield(L, -2, "physics_init");
+  
+  lua_pushcfunction(L, lua_conx_physics_update);
+  lua_setfield(L, -2, "physics_update");
+  
+  lua_pushcfunction(L, lua_conx_physics_create_body);
+  lua_setfield(L, -2, "physics_create_body");
+  
+  lua_pushcfunction(L, lua_conx_physics_set_velocity);
+  lua_setfield(L, -2, "physics_set_velocity");
+  
+  lua_pushcfunction(L, lua_conx_physics_get_position);
+  lua_setfield(L, -2, "physics_get_position");
+  
+  lua_pushcfunction(L, lua_conx_physics_set_static);
+  lua_setfield(L, -2, "physics_set_static");
+  
+  lua_pushcfunction(L, lua_conx_physics_add_sphere_shape);
+  lua_setfield(L, -2, "physics_add_sphere_shape");
+  
+  lua_pushcfunction(L, lua_conx_physics_add_box_shape);
+  lua_setfield(L, -2, "physics_add_box_shape");
+  
+  lua_pushcfunction(L, lua_conx_physics_set_gravity);
+  lua_setfield(L, -2, "physics_set_gravity");
 
   lua_setglobal(L, "ConX");
 
